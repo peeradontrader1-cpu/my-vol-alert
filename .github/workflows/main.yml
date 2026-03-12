@@ -1,0 +1,22 @@
+name: Fetch Vol2Vol to Telegram
+on:
+  schedule:
+    - cron: '*/10 * * * *' # สั่งให้ทำงานอัตโนมัติทุก 10 นาที
+  workflow_dispatch:      # ช่วยให้เรามีปุ่มกดสั่งรันเองเพื่อทดสอบได้ทันที
+
+jobs:
+  check_data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Data and Send to Telegram
+        run: |
+          # 1. ดึงข้อมูลจากไฟล์ Raw ใน GitHub ต้นทาง
+          DATA=$(curl -s https://raw.githubusercontent.com/pageth/Vol2VolData/main/IntradayData.txt)
+          
+          # 2. นำข้อมูลมาจัดรูปแบบข้อความ (ใช้ %0A เพื่อขึ้นบรรทัดใหม่ใน Telegram)
+          MESSAGE="📊 Update Vol2Vol:%0A$DATA"
+          
+          # 3. ส่งข้อมูลเข้า Telegram โดยใช้ Token และ ID ที่เราตั้งไว้ใน Secrets
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="$MESSAGE"
