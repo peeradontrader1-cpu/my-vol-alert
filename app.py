@@ -11,7 +11,7 @@ st.markdown("""
     .main { background-color: #0e1117; }
     div.stMetric { background-color: #1c1e24; padding: 15px; border-radius: 10px; border: 1px solid #31333f; }
     </style>
-    """, unsafe_allow_name=True)
+    """, unsafe_allow_html=True)
 
 # 2. ฟังก์ชันดึงข้อมูลจาก GitHub ต้นทาง
 @st.cache_data(ttl=300)
