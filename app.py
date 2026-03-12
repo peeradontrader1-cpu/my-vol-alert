@@ -3,16 +3,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 from io import StringIO
+from plotly.subplots import make_subplots
 
 st.set_page_config(page_title="Gold Vol2Vol Tracker", layout="wide")
-
-# ตกแต่ง CSS
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    div.stMetric { background-color: #1c1e24; padding: 15px; border-radius: 10px; border: 1px solid #31333f; }
-    </style>
-    """, unsafe_allow_html=True)
 
 @st.cache_data(ttl=60)
 def load_data():
@@ -20,61 +13,52 @@ def load_data():
     response = requests.get(url)
     lines = response.text.split('\n')
     
-    # กรองเอาเฉพาะบรรทัดที่มีข้อมูลจริงๆ (บรรทัดที่เริ่มด้วยตัวเลข Strike Price)
-    # และข้ามบรรทัดที่เป็นข้อความอธิบายด้านบน
-    data_lines = []
-    header_found = False
+    clean_data = []
     for line in lines:
-        if 'StrikePrice' in line:
-            data_lines.append(line)
-            header_found = True
-        elif header_found and line.strip():
-            data_lines.append(line)
-            
-    if not data_lines: # ถ้าหา Header ไม่เจอ ให้ใช้โหมดบังคับอ่าน
-        df = pd.read_csv(StringIO(response.text), sep=r'\s+', skiprows=1, engine='python')
-    else:
-        df = pd.read_csv(StringIO('\n'.join(data_lines)), sep=r'\s+', engine='python')
+        parts = line.split()
+        # เช็คว่าบรรทัดนั้นเริ่มด้วยตัวเลข Strike Price หรือไม่ (เช่น 5100, 5200)
+        if len(parts) >= 4 and parts[0].replace('.', '', 1).isdigit():
+            clean_data.append(parts)
     
-    # แปลงเป็นตัวเลขเพื่อป้องกัน Error ในการวาดกราฟ
-    for col in ['StrikePrice', 'CallVol', 'PutVol']:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+    # สร้างตารางใหม่โดยกำหนดชื่อคอลัมน์เองเลย เพื่อตัดปัญหาหาหัวข้อไม่เจอ
+    # ลำดับคือ: StrikePrice, CallVol, PutVol, TotalVol, VolSettle
+    df = pd.DataFrame(clean_data).iloc[:, :5] 
+    df.columns = ['StrikePrice', 'CallVol', 'PutVol', 'TotalVol', 'VolSettle']
+    
+    # แปลงทุกอย่างเป็นตัวเลข
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
     
     return df.dropna(subset=['StrikePrice'])
 
-st.title("📊 Gold Vol2Vol Dashboard")
+st.title("🏆 Gold Vol2Vol Dashboard")
 
 try:
     df = load_data()
 
-    if 'StrikePrice' in df.columns:
-        # ส่วน Metrics
-        col1, col2, col3 = st.columns(3)
+    if not df.empty:
+        # แสดง Metrics
+        c1, c2, c3 = st.columns(3)
         p_vol = df['PutVol'].sum()
         c_vol = df['CallVol'].sum()
-        col1.metric("Put Volume", f"{int(p_vol):,}")
-        col2.metric("Call Volume", f"{int(c_vol):,}")
-        col3.metric("P/C Ratio", round(p_vol/c_vol, 2) if c_vol != 0 else 0)
+        c1.metric("Put Volume", f"{int(p_vol):,}")
+        c2.metric("Call Volume", f"{int(c_vol):,}")
+        c3.metric("P/C Ratio", round(p_vol/c_vol, 2) if c_vol != 0 else 0)
 
-        # ส่วนกราฟ
-        fig = go.Figure()
-        fig.add_trace(go.Bar(x=df['StrikePrice'], y=df['PutVol'], name='Put', marker_color='#FF8C00'))
-        fig.add_trace(go.Bar(x=df['StrikePrice'], y=df['CallVol'], name='Call', marker_color='#1E90FF'))
-        
-        fig.update_layout(
-            template="plotly_dark",
-            barmode='group',
-            xaxis=dict(type='category', title="Strike Price"),
-            yaxis_title="Volume"
-        )
+        # วาดกราฟ
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        fig.add_trace(go.Bar(x=df['StrikePrice'], y=df['PutVol'], name='Put Vol', marker_color='#FF9800'), secondary_y=False)
+        fig.add_trace(go.Bar(x=df['StrikePrice'], y=df['CallVol'], name='Call Vol', marker_color='#2196F3'), secondary_y=False)
+        fig.add_trace(go.Scatter(x=df['StrikePrice'], y=df['VolSettle'], name='Vol Settle', 
+                               line=dict(color='#FF5252', width=3)), secondary_y=True)
+
+        fig.update_layout(template="plotly_dark", barmode='group', height=600)
         st.plotly_chart(fig, use_container_width=True)
         
-        with st.expander("ดูข้อมูลดิบ"):
+        with st.expander("ดูตารางข้อมูลดิบ"):
             st.dataframe(df)
     else:
-        st.error("ยังหาหัวข้อ StrikePrice ไม่เจอ")
-        st.write("ข้อมูลที่อ่านได้บางส่วน:", df.head())
+        st.warning("ระบบตรวจพบไฟล์แต่ยังไม่สามารถแยกแยะข้อมูลได้ กรุณารอการอัปเดตไฟล์ต้นทาง")
 
 except Exception as e:
     st.error(f"Error: {e}")
