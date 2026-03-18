@@ -1,22 +1,20 @@
-name: Fetch Vol2Vol to Telegram
+name: Send Vol2Vol Image to Telegram
 on:
   schedule:
-    - cron: '*/10 * * * *' # สั่งให้ทำงานอัตโนมัติทุก 10 นาที
-  workflow_dispatch:      # ช่วยให้เรามีปุ่มกดสั่งรันเองเพื่อทดสอบได้ทันที
+    - cron: '*/10 * * * *'  # ทำงานทุก 10 นาที
+  workflow_dispatch:      # กดรันเองเพื่อทดสอบได้ทันที
 
 jobs:
-  check_data:
+  send_image:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch Data and Send to Telegram
+      - name: Send PNG from GitHub to Telegram
         run: |
-          # 1. ดึงข้อมูลจากไฟล์ Raw ใน GitHub ต้นทาง
-          DATA=$(curl -s https://raw.githubusercontent.com/pageth/Vol2VolData/main/IntradayData.txt)
-          
-          # 2. นำข้อมูลมาจัดรูปแบบข้อความ (ใช้ %0A เพื่อขึ้นบรรทัดใหม่ใน Telegram)
-          MESSAGE="📊 Update Vol2Vol:%0A$DATA"
-          
-          # 3. ส่งข้อมูลเข้า Telegram โดยใช้ Token และ ID ที่เราตั้งไว้ใน Secrets
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
-            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="$MESSAGE"
+          # 1. กำหนด URL ของรูปภาพแบบ Raw (แหล่งข้อมูลใหม่ของคุณ)
+          IMAGE_URL="https://raw.githubusercontent.com/peeradontrader1-cpu/Vol2VolData/main/Intraday%2BOI.png"
+
+          # 2. ส่งรูปภาพเข้า Telegram โดยใช้ Token และ ID ที่อยู่ใน Secrets
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto" \
+            -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -F photo="$IMAGE_URL" \
+            -F caption="📊 อัปเดตข้อมูล Vol2Vol (Intraday + OI) ล่าสุดครับ"
